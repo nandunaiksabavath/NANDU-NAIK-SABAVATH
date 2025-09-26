@@ -1,0 +1,7 @@
+{
+  "name": "Kisan Mitra: Farmer Advisory System",
+  "description": "A farmer's friend, providing AI-powered agricultural advice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
