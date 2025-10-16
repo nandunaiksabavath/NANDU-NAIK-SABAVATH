@@ -133,3 +133,57 @@ export const getMarketPrices = async (location: string): Promise<MarketPrice[]> 
     throw new Error("Failed to fetch market prices. The AI expert might be busy or the location may not be found. Please try again.");
   }
 };
+
+
+export interface SoilAnalysisResult {
+  soilType: string;
+  texture: string;
+  potentialPH: string;
+  nutrientStatus: string;
+  recommendations: string;
+}
+
+const soilAnalysisSystemInstruction = (language: string) => `You are a soil science expert AI, providing analysis based on an image. Your task is to analyze the soil image and provide a concise, easy-to-understand report for a farmer.
+Your final output must be a JSON object with the following properties:
+- "soilType": (string) The likely soil type (e.g., "Sandy Loam", "Clay", "Silt").
+- "texture": (string) A description of the soil texture (e.g., "Crumbly and fine", "Hard and cloddy").
+- "potentialPH": (string) An estimated pH range (e.g., "Slightly Acidic (6.0-6.5)").
+- "nutrientStatus": (string) A brief assessment of potential nutrient status (e.g., "Appears low in organic matter. Potential nitrogen deficiency.").
+- "recommendations": (string) A few bullet-pointed, actionable recommendations for improving soil health (e.g., "- Add compost to increase organic matter.\\n- Test soil formally for accurate pH and nutrient levels.").
+The entire response must be in the ${language} language.`;
+
+export const getSoilAnalysis = async (imageBase64: string, language: string): Promise<SoilAnalysisResult> => {
+  try {
+    const imagePart = {
+      inlineData: {
+        data: imageBase64.split(',')[1], // Remove the data URI prefix
+        mimeType: 'image/jpeg',
+      },
+    };
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [imagePart] },
+      config: {
+        systemInstruction: soilAnalysisSystemInstruction(language),
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            soilType: { type: Type.STRING },
+            texture: { type: Type.STRING },
+            potentialPH: { type: Type.STRING },
+            nutrientStatus: { type: Type.STRING },
+            recommendations: { type: Type.STRING },
+          },
+          required: ["soilType", "texture", "potentialPH", "nutrientStatus", "recommendations"],
+        },
+      },
+    });
+
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Error analyzing soil image with Gemini API:", error);
+    throw new Error("Failed to analyze soil. The AI expert might be busy or the image may not be clear. Please try again.");
+  }
+};

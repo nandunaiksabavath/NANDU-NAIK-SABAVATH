@@ -2,8 +2,9 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { QueryInput } from './components/QueryInput';
 import { AdvisoryResponse } from './components/AdvisoryResponse';
-import { getAdvisory, getMarketPrices, MarketPrice } from './services/geminiService';
+import { getAdvisory, getMarketPrices, getSoilAnalysis, MarketPrice, SoilAnalysisResult } from './services/geminiService';
 import { MarketPrices } from './components/MarketPrices';
+import { SoilAnalysis } from './components/SoilAnalysis';
 
 declare global {
   interface Window {
@@ -50,11 +51,14 @@ const App: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [selectedLang, setSelectedLang] = useState<string>('en-US');
   
-  // New state for Market Prices feature
   const [marketLocation, setMarketLocation] = useState<string>('');
   const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
   const [isMarketLoading, setIsMarketLoading] = useState<boolean>(false);
   const [marketError, setMarketError] = useState<string>('');
+  
+  const [soilAnalysis, setSoilAnalysis] = useState<SoilAnalysisResult | null>(null);
+  const [isSoilLoading, setIsSoilLoading] = useState<boolean>(false);
+  const [soilError, setSoilError] = useState<string>('');
 
   const recognitionRef = useRef<any>(null);
 
@@ -110,7 +114,7 @@ const App: React.FC = () => {
         setError("Text-to-speech is not supported in this browser.");
         return;
     }
-    window.speechSynthesis.cancel(); // Stop any currently playing speech before starting a new one
+    window.speechSynthesis.cancel(); 
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = selectedLang;
@@ -157,7 +161,6 @@ const App: React.FC = () => {
     }
   }, [query, selectedLang]);
   
-  // Automatically speak the response when it is generated
   useEffect(() => {
     if (response?.text && !isLoading && !error) {
       handleSpeak(response.text);
@@ -188,6 +191,29 @@ const App: React.FC = () => {
       setIsMarketLoading(false);
     }
   }, [marketLocation]);
+
+  const handleAnalyzeSoil = useCallback(async (imageBase64: string) => {
+    if (!imageBase64) {
+      setSoilError('No image provided for analysis.');
+      return;
+    }
+
+    setIsSoilLoading(true);
+    setSoilError('');
+    setSoilAnalysis(null);
+
+    try {
+      const selectedLanguageName = languages.find(l => l.code === selectedLang)?.name || 'English';
+      const result = await getSoilAnalysis(imageBase64, selectedLanguageName);
+      setSoilAnalysis(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'An unknown error occurred.';
+      setSoilError(message);
+      console.error(err);
+    } finally {
+      setIsSoilLoading(false);
+    }
+  }, [selectedLang]);
 
   return (
     <div className="min-h-screen font-sans text-brand-gray flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -221,6 +247,12 @@ const App: React.FC = () => {
             prices={marketPrices}
             isLoading={isMarketLoading}
             error={marketError}
+          />
+          <SoilAnalysis
+            onSubmit={handleAnalyzeSoil}
+            analysis={soilAnalysis}
+            isLoading={isSoilLoading}
+            error={soilError}
           />
         </main>
         <footer className="text-center mt-8 text-gray-500 text-sm">
